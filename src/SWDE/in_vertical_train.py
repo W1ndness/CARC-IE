@@ -28,14 +28,12 @@ flags.DEFINE_string("pack_path", "",
                     "The file path to save the packed data, done in pack_data.py")
 flags.DEFINE_string("nodes_info_path", "",
                     "The path for html pages info with nodes info, done in prepare_data.py")
-flags.DEFINE_string("verticals", constants.VERTICAL_WEBSITES.keys(),
+flags.DEFINE_string("verticals", "auto,book,camera,job,movie,nbaplayer,restaurant,university",
                     "Verticals used in training, splits with \',\'")
 flags.DEFINE_integer("num_seeds", 1,
                      "Seed websites used for training.")
 flags.DEFINE_boolean("shuffle", "True",
                      "If shuffle the dataset.")
-flags.DEFINE_integer("num_workers", 4,
-                     "Number of workers for training.")
 flags.DEFINE_boolean("drop_last", True,
                      "If drop the last batch.")
 
@@ -61,7 +59,7 @@ def find_vertical(packed_data, vertical):
 
 def find_website_pages_in_pack_data(packed_vertical_data, website, num):
     st = 0
-    while st < len(packed_vertical_data) and packed_vertical_data["website"] != website:
+    while st < len(packed_vertical_data) and packed_vertical_data[st]["website"] != website:
         st += 1
     return packed_vertical_data[st:st + num]
 
@@ -71,17 +69,21 @@ def read_website_counts_from_list(website_list_path, vertical):
         lines = f.readlines()
     contents = None
     for i, line in enumerate(lines):
-        if line == vertical:
+        if line.strip() == vertical:
             contents = lines[i + 2:i + 12]
             break
     if contents is None:
         raise Exception(f"{vertical} not found in {website_list_path}")
-    return {line.split(" ")[0]: int(line.split(" ")[1]) for line in contents}
+    return {line.split("\t")[0].split(" ")[0]: int(line.split("\t")[0].split(" ")[-1]) for line in contents}
 
 
 def make_dataset(vertical, websites, website_counts, packed_vertical_data, split=False):
+    attributes = constants.ATTRIBUTES[vertical]
+    label_map = {attribute: i for i, attribute in enumerate(attributes)}
+    label_map['None'] = len(attributes)
     samples = []
     for website in websites:
+        logging.info(f"Processing {website}")
         count = website_counts[website]
         websites_pack_data = find_website_pages_in_pack_data(packed_vertical_data,
                                                              website,
@@ -90,14 +92,15 @@ def make_dataset(vertical, websites, website_counts, packed_vertical_data, split
                                                 vertical,
                                                 f'{vertical}-{website}.pkl')
         websites_nodes_info = load_from_pkl(websites_nodes_info_path)
+        logging.info(f"Load from {websites_nodes_info_path}")
         website_samples = []
         for page in websites_pack_data:
             page_id = page['id']
-            page_no = page_id.split('-')[-1]
+            page_no = int(page_id.split('-')[-1])
             page_html = page['html_str']
             page_info = websites_nodes_info[page_no]
             assert page_info['page_id'] == page_id
-            website_samples.append(Sample(page_info, page_html, website))
+            website_samples.append(Sample(page_info, page_html, website, label_map))
         samples += website_samples
     if not split:
         return SampleDataset(samples)
@@ -121,38 +124,41 @@ def prepare_in_vertical_dataset(packed_data, vertical, num_seeds):
     website_counts = read_website_counts_from_list(website_list_path, vertical)
     train_dataset, val_dataset = make_dataset(vertical, seed_websites, website_counts,
                                               packed_vertical_data, split=True)
+    logging.info(f"Finished preparing in-vertical dataset for {vertical}")
     test_dataset = make_dataset(vertical, test_websites, website_counts, packed_vertical_data)
-    num_classes = len(constants.ATTRIBUTES["vertical"]) + 1
+    num_classes = len(constants.ATTRIBUTES[vertical]) + 1
     return train_dataset, val_dataset, test_dataset, num_classes
 
 
 def in_vertical_train(train_dataset, val_dataset, test_dataset, num_classes):
+    logging.info(f"Training in-vertical model")
+    logging.info(f"Number of classes: {num_classes}")
+    logging.info(f"Number of training samples: {len(train_dataset)}")
+    logging.info(f"Number of validation samples: {len(val_dataset)}")
+    logging.info(f"Number of test samples: {len(test_dataset)}")
+    logging.info("Preparing dataloader.")
     train_iter = DataLoader(train_dataset,
                             batch_size=FLAGS.batch_size,
                             shuffle=FLAGS.shuffle,
-                            num_workers=FLAGS.num_workers,
                             drop_last=FLAGS.drop_last,
                             collate_fn=collate_fn)
     val_iter = DataLoader(val_dataset,
                           batch_size=FLAGS.batch_size,
                           shuffle=FLAGS.shuffle,
-                          num_workers=FLAGS.num_workers,
                           drop_last=FLAGS.drop_last,
                           collate_fn=collate_fn)
     test_iter = DataLoader(test_dataset,
                            batch_size=FLAGS.batch_size,
                            shuffle=FLAGS.shuffle,
-                           num_workers=FLAGS.num_workers,
                            drop_last=FLAGS.drop_last,
                            collate_fn=collate_fn)
     xpath_embed_config = MarkupLMConfig()
     config = ModelConfig(text_embed_size=768,
-                         gnn_out_size=768,
+                         gnn_out_size=384,
                          xpath_embeddings_config=xpath_embed_config,
                          gnn_activation='ReLU',
-                         gnn_aggregator=None,
                          gnn_dropout=.5,
-                         mlp_hidden_dims=[768],
+                         mlp_hidden_dims=[],
                          mlp_activation='ReLU',
                          mlp_dropout=.5,
                          mlp_batch_norm=True,

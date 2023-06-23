@@ -13,7 +13,7 @@ class MLPClassifier(nn.Module):
         self.input_dim = input_dim
         self.output_dim = output_dim
         self.hidden_dims = hidden_dims
-        self.activation = activation
+        self.activation = get_activation(activation)
         self.dropout = dropout
         self.batch_norm = batch_norm
 

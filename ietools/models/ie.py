@@ -8,7 +8,6 @@ from torch.nn import functional as F
 from .classifier import MLPClassifier
 from .encoder import XPathEmbeddings
 from .graph import GNN
-from ..utils.functions import get_activation
 
 
 class ModelConfig:
@@ -17,7 +16,6 @@ class ModelConfig:
                  gnn_out_size: int,
                  xpath_embeddings_config: MarkupLMConfig,
                  gnn_activation: str,
-                 gnn_aggregator,
                  gnn_dropout: float,
                  mlp_hidden_dims: List[int],
                  mlp_activation: str,
@@ -28,7 +26,6 @@ class ModelConfig:
         self.gnn_out_size = gnn_out_size
         self.xpath_embeddings_config = xpath_embeddings_config
         self.gnn_activation = gnn_activation
-        self.gnn_aggregator = gnn_aggregator
         self.gnn_dropout = gnn_dropout
         self.mlp_hidden_dims = mlp_hidden_dims
         self.mlp_activation = mlp_activation
@@ -46,7 +43,6 @@ def fetch_text_nodes_xpath_embeddings(xpath_embeddings, ids):
     return torch.stack(text_node_embeddings)
 
 
-
 class Model(nn.Module):
     def __init__(self,
                  config: ModelConfig):
@@ -54,12 +50,11 @@ class Model(nn.Module):
         self.xpath_embeddings = XPathEmbeddings(config.xpath_embeddings_config)
         self.gnn = GNN(config.text_embed_size + config.xpath_embeddings_config.hidden_size,
                        config.gnn_out_size,
-                       get_activation(config.gnn_activation),
-                       config.gnn_aggregator)
+                       config.gnn_activation)
         self.classifier = MLPClassifier(config.gnn_out_size,
                                         config.num_classes,
                                         config.mlp_hidden_dims,
-                                        get_activation(config.mlp_activation),
+                                        config.mlp_activation,
                                         config.mlp_dropout,
                                         config.mlp_batch_norm)
 

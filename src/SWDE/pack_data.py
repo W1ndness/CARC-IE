@@ -92,7 +92,7 @@ def pack_swde_data(swde_path, pack_path, cut_off):
                 website = re.search('(.*)-(.*)\((.*)\)', w).groups()[1]
                 page_id = f'{v}-{website}-{filename[:4]}'
                 print(page_id)
-                page = dict(id=page_id, vertical=v, website=w, path=os.path.join(v, w, filename))
+                page = dict(id=page_id, vertical=v, website=website, path=os.path.join(v, w, filename))
                 # path is something like `book/book-amazon(2000)/0000.htm`
                 swde_data.append(page)
                 page_count += 1

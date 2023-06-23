@@ -1,42 +1,53 @@
 from typing import List
 
 import torch
+from absl import logging
 from torch import nn
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import Dataset
 from torch.utils.data.dataset import T_co
 import dgl
 
 from ..utils.functions import get_dom_tree
 from .graph import build_dom_graph, nx2dgl
 from ..models.encoder import TextEncoder
+from ..utils import swde as constants
+
+encoder = TextEncoder()
 
 
 def get_texts(dom, text_nodes_ids):
-    return [element.text.strip() for idx, element in enumerate(dom) if idx in text_nodes_ids]
+    return [element.text.strip() for idx, element in enumerate(dom.iter()) if idx in text_nodes_ids]
+
+
+def mapping_labels(labels, label_map):
+    return [label_map[label] for label in labels]
 
 
 class Sample:
-    def __init__(self, page_info: dict, page_html, website):
+    def __init__(self, page_info: dict, page_html, website, label_map):
+        self.idx = page_info["page_id"]
         nodes_info = page_info["nodes_info"]
-        self.text_nodes_ids = [node["id"] for node in nodes_info]
+        self.text_nodes_ids = [node["idx"] for node in nodes_info]
         dom = get_dom_tree(page_html, website)
         self.text_nodes_texts = get_texts(dom, self.text_nodes_ids)
-        self.text_nodes_labels = [node["label"] for node in nodes_info]
-        self.all_xpath_tags_seq = [node["xpath_tag_seq"] for node in nodes_info]
-        self.all_xpath_subs_seq = [node["xpath_sub_seq"] for node in nodes_info]
+        if not self.text_nodes_texts:
+            self.text_nodes_texts = [""]
+        self.text_nodes_labels = mapping_labels([node["label"] for node in nodes_info], label_map)
+        self.xpath_tags_seq = page_info["xpath_tags_seq"]
+        self.xpath_subs_seq = page_info["xpath_subs_seq"]
         backbone = build_dom_graph(dom)
         self.graph = nx2dgl(backbone)
 
     @property
     def features(self):
-        encoder = TextEncoder()
         with torch.no_grad():
             embeddings = encoder(self.text_nodes_texts).cpu()
+            torch.cuda.empty_cache()
         return {
             "text_nodes_ids": self.text_nodes_ids,
             "text_nodes_texts": embeddings,
-            "all_xpath_tags_seq": self.all_xpath_tags_seq,
-            "all_xpath_subs_seq": self.all_xpath_subs_seq,
+            "xpath_tags_seq": self.xpath_tags_seq,
+            "xpath_subs_seq": self.xpath_subs_seq,
             "graph": self.graph,
         }
 
@@ -61,10 +72,10 @@ def collate_fn(samples: list) -> T_co:
         batched_labels = torch.Tensor(labels)
     else:
         batched_labels = labels
-    ids = [features["text_nodes_ids"] for feature in features]
+    ids = [feature["text_nodes_ids"] for feature in features]
     texts = [feature["text_nodes_texts"] for feature in features]
-    xpath_tags_seq = [feature["all_xpath_tags_seq"] for feature in features]
-    xpath_subs_seq = [feature["all_xpath_subs_seq"] for feature in features]
+    xpath_tags_seq = [feature["xpath_tags_seq"] for feature in features]
+    xpath_subs_seq = [feature["xpath_subs_seq"] for feature in features]
     graphs = dgl.batch([feature["graph"] for feature in features])
     batched_features = {
         "ids": ids,

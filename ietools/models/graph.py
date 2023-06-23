@@ -10,13 +10,13 @@ from ..utils.functions import get_activation
 
 def build_dom_graph(dom):
     g = nx.DiGraph()
-    elements = dom.iter()
-    element2idx = {element: idx for idx, element in enumerate(elements)}
-    idx2element = {idx: element for idx, element in enumerate(elements)}
-    for idx, node in enumerate(elements):
-        element = idx2element[idx]
+    element2idx = {element: idx for idx, element in enumerate(dom.iter())}
+    for idx, element in enumerate(dom.iter()):
+        g.add_node(idx)
+    for idx, element in enumerate(dom.iter()):
         parent = element.getparent()
-        g.add_edge(idx, element2idx[parent])
+        if parent is not None:
+            g.add_edge(idx, element2idx[parent])
         children = element.getchildren()
         for child in children:
             g.add_edge(idx, element2idx[child])
@@ -25,7 +25,7 @@ def build_dom_graph(dom):
 
 def nx2dgl(g: nx.Graph):
     adj = np.array(nx.adjacency_matrix(g).todense())
-    if not len(np.where(~adj.any(axis=1))[0]):
+    if len(np.where(~adj.any(axis=1))[0]):
         raise ValueError(g, "Graph has zero degree node.")
     graph_as_dgl = dgl.from_networkx(g)
     return dgl.add_self_loop(graph_as_dgl)

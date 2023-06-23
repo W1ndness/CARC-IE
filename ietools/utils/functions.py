@@ -94,7 +94,10 @@ def get_activation(activation):
         return nn.LogSoftmax()
     else:
         raise ValueError(
-            "Invalid activation function. Choose from: ReLU, ReLU6, ELU, SELU, CELU, LeakyReLU, PReLU, RReLU, GELU, Sigmoid, Tanh, Hardtanh, LogSigmoid, Softmax, Softmax2d, LogSoftmax")
+            "Invalid activation function. "
+            "Choose from: ReLU, ReLU6, ELU, SELU, CELU, LeakyReLU, PReLU, RReLU, GELU, Sigmoid, Tanh, Hardtanh, "
+            "LogSigmoid, Softmax, Softmax2d, LogSoftmax, "
+            f"Now as: {activation}")
 
 
 def load_from_pkl(path, mode='rb'):

@@ -12,7 +12,7 @@ class TextEncoder(nn.Module):
     def __init__(self, model_name='bert-base-cased'):
         super(TextEncoder, self).__init__()
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
-        self.model = AutoModel.from_pretrained(model_name)
+        self.model = AutoModel.from_pretrained(model_name).to(devices[0])
 
     def forward(self, texts):
         inputs = self.tokenizer(texts, return_tensors="pt", padding=True, truncation=True)
