@@ -18,9 +18,9 @@ def get_texts(dom, text_nodes_ids):
 class Sample:
     def __init__(self, page_info: dict, page_html, website):
         nodes_info = page_info["nodes_info"]
-        text_nodes_ids = [node["id"] for node in nodes_info]
+        self.text_nodes_ids = [node["id"] for node in nodes_info]
         dom = get_dom_tree(page_html, website)
-        self.text_nodes_texts = get_texts(dom, text_nodes_ids)
+        self.text_nodes_texts = get_texts(dom, self.text_nodes_ids)
         self.text_nodes_labels = [node["label"] for node in nodes_info]
         self.all_xpath_tags_seq = [node["xpath_tag_seq"] for node in nodes_info]
         self.all_xpath_subs_seq = [node["xpath_sub_seq"] for node in nodes_info]
@@ -33,6 +33,7 @@ class Sample:
         with torch.no_grad():
             embeddings = encoder(self.text_nodes_texts).cpu()
         return {
+            "text_nodes_ids": self.text_nodes_ids,
             "text_nodes_texts": embeddings,
             "all_xpath_tags_seq": self.all_xpath_tags_seq,
             "all_xpath_subs_seq": self.all_xpath_subs_seq,
@@ -60,12 +61,14 @@ def collate_fn(samples: list) -> T_co:
         batched_labels = torch.Tensor(labels)
     else:
         batched_labels = labels
+    ids = [features["text_nodes_ids"] for feature in features]
     texts = [feature["text_nodes_texts"] for feature in features]
     xpath_tags_seq = [feature["all_xpath_tags_seq"] for feature in features]
     xpath_subs_seq = [feature["all_xpath_subs_seq"] for feature in features]
     graphs = dgl.batch([feature["graph"] for feature in features])
     batched_features = {
-        "texts": torch.stack(texts, dim=0),
+        "ids": ids,
+        "text_embeddings": torch.stack(texts, dim=0),
         "xpath_tags_seq": xpath_tags_seq,
         "xpath_subs_seq": xpath_subs_seq,
         "graphs": graphs,

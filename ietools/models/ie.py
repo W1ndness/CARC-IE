@@ -37,6 +37,16 @@ class ModelConfig:
         self.num_classes = num_classes
 
 
+def fetch_text_nodes_xpath_embeddings(xpath_embeddings, ids):
+    text_node_embeddings = []
+    for idx, indices in enumerate(ids):
+        xpath_embedding = xpath_embeddings[idx]
+        text_node_embedding = torch.index_select(xpath_embedding, 0, indices)
+        text_node_embeddings.append(text_node_embedding)
+    return torch.stack(text_node_embeddings)
+
+
+
 class Model(nn.Module):
     def __init__(self,
                  config: ModelConfig):
@@ -53,16 +63,17 @@ class Model(nn.Module):
                                         config.mlp_dropout,
                                         config.mlp_batch_norm)
 
-    def forward(self,
-                text_embeddings,
-                xpath_tags_seq,
-                xpath_subs_seq,
-                g):
+    def forward(self, batch):
+        ids = batch['ids']
+        text_embeddings = batch['text_embeddings']
+        xpath_tags_seq = batch['xpath_tags_seq']
+        xpath_subs_seq = batch['xpath_subs_seq']
+        graphs = batch['graphs']
         xpath_embeddings = self.xpath_embeddings(xpath_tags_seq, xpath_subs_seq)
-        node_embeddings = torch.concat([F.normalize(text_embeddings),
-                                        F.normalize(xpath_embeddings)], dim=1)
-        h = self.gnn(g, node_embeddings)
-        output = self.classifier(h)
+        h = self.gnn(graphs, xpath_embeddings)
+        text_node_xpath_embeddings = fetch_text_nodes_xpath_embeddings(h, ids)
+        text_node_embeddings = torch.cat([text_embeddings, text_node_xpath_embeddings], dim=1)
+        output = self.classifier(text_node_embeddings)
         return output
 
 

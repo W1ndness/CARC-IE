@@ -32,23 +32,25 @@ def nx2dgl(g: nx.Graph):
 
 
 class GNN(nn.Module):
-    def __init__(self, in_feats, out_feats, activation, aggregator, dropout=0.5):
+    def __init__(self, in_feats, out_feats, activation, dropout=0.5):
         super(GNN, self).__init__()
         self.in_feats = in_feats
         self.out_feats = out_feats
         self.activation = get_activation(activation)
-        self.aggregator = aggregator
         self.dropout = dropout
 
         self.linear = nn.Linear(in_feats, out_feats)
         self.dropout_layer = nn.Dropout(p=dropout)
 
+        self.message_func = lambda edges: {'msg': edges.src['h']}
+        self.reduce_func = lambda nodes: {'h': torch.sum(nodes.mailbox['msg'], dim=1)}
+
     def forward(self, g, x):
         h = self.activation(self.linear(x))
         h = self.dropout_layer(h)
         g.ndata['h'] = h
-        g.update_all(message_func=self.aggregator.message_func,
-                     reduce_func=self.aggregator.reduce_func)
+        g.update_all(message_func=self.message_func,
+                     reduce_func=self.reduce_func)
         h = g.ndata.pop('h')
         return h
 

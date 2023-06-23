@@ -139,11 +139,11 @@ def train(model, train_iter, test_iter,
         # metrics on test samples per epoch
         test_acc, test_recall, test_precision, test_f1 = evaluate_gpu(model, test_iter)
         logging.info("Epoch {:d}: "
-                     "Test acc {:.3f}, Test recall {:.3f}, Test precision {:.3f}, Test f1 {:.3f}".format(epoch,
-                                                                                                         test_acc,
-                                                                                                         test_recall,
-                                                                                                         test_precision,
-                                                                                                         test_f1))
+                     "Val acc {:.3f}, Val recall {:.3f}, Val precision {:.3f}, Val f1 {:.3f}".format(epoch,
+                                                                                                     test_acc,
+                                                                                                     test_recall,
+                                                                                                     test_precision,
+                                                                                                     test_f1))
         # d2l animator setting
         animator.add(epoch + 1, (None, None, None, None, test_acc))
 
@@ -154,11 +154,11 @@ def train(model, train_iter, test_iter,
                             "Avg train recall": avg_train_recall,
                             "Avg train precision": avg_train_precision},
                            epoch)
-        writer.add_scalars("Test Metrics",
-                           {"Test acc": test_acc,
-                            "Test recall": test_recall,
-                            "Test precision": test_precision,
-                            "Test F1 Score": test_f1},
+        writer.add_scalars("Validation Metrics",
+                           {"Val acc": test_acc,
+                            "Val recall": test_recall,
+                            "Val precision": test_precision,
+                            "Val F1 Score": test_f1},
                            epoch)
     animator.fig.show()
     logging.info(f'loss {metric[0] / metric[2]:.3f}, train acc '

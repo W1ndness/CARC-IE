@@ -30,20 +30,23 @@ flags.DEFINE_string("nodes_info_path", "",
                     "The path for html pages info with nodes info, done in prepare_data.py")
 flags.DEFINE_string("verticals", constants.VERTICAL_WEBSITES.keys(),
                     "Verticals used in training, splits with \',\'")
-flags.DEFINE_integer("num_seeds", "1",
+flags.DEFINE_integer("num_seeds", 1,
                      "Seed websites used for training.")
-flags.DEFINE_boolean("shuffle", "True", "If shuffle the dataset.")
-flags.DEFINE_integer("num_workers", "4",
+flags.DEFINE_boolean("shuffle", "True",
+                     "If shuffle the dataset.")
+flags.DEFINE_integer("num_workers", 4,
                      "Number of workers for training.")
-flags.DEFINE_boolean("drop_last", "True", "If drop the last batch.")
+flags.DEFINE_boolean("drop_last", True,
+                     "If drop the last batch.")
 
 # args for model
-flags.DEFINE_integer("batch_size", "32",
+flags.DEFINE_integer("batch_size", 32,
                      "Batch size for training.")
-flags.DEFINE_integer("num_epochs", "200",
+flags.DEFINE_integer("num_epochs", 100,
                      "Number of epochs for training.")
-flags.DEFINE_enum("optimizer", "Adam", ["Adam", "AdamW", "SGD"])
-flags.DEFINE_float("lr", "0.001",
+flags.DEFINE_enum("optimizer", "Adam", ["Adam", "AdamW", "SGD"],
+                  "The optimizer used for training.")
+flags.DEFINE_float("lr", 0.001,
                    "Learning rate for training.")
 
 
@@ -119,7 +122,8 @@ def prepare_in_vertical_dataset(packed_data, vertical, num_seeds):
     train_dataset, val_dataset = make_dataset(vertical, seed_websites, website_counts,
                                               packed_vertical_data, split=True)
     test_dataset = make_dataset(vertical, test_websites, website_counts, packed_vertical_data)
-    return train_dataset, val_dataset, test_dataset
+    num_classes = len(constants.ATTRIBUTES["vertical"]) + 1
+    return train_dataset, val_dataset, test_dataset, num_classes
 
 
 def in_vertical_train(train_dataset, val_dataset, test_dataset, num_classes):
@@ -161,9 +165,12 @@ def in_vertical_train(train_dataset, val_dataset, test_dataset, num_classes):
 
 def main(_):
     packed_data = load_from_pkl(FLAGS.pack_path)
-    train_dataset, val_dataset, test_dataset = prepare_in_vertical_dataset(packed_data,
-                                                                           FLAGS.verticals,
-                                                                           FLAGS.num_seeds)
+    verticals = FLAGS.verticals.split(",")
+    for vertical in verticals:
+        train_dataset, val_dataset, test_dataset, num_classes = prepare_in_vertical_dataset(packed_data,
+                                                                                            vertical,
+                                                                                            FLAGS.num_seeds)
+        in_vertical_train(train_dataset, val_dataset, test_dataset, num_classes)
 
 
 if __name__ == '__main__':
