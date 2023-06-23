@@ -5,9 +5,9 @@ from torch import nn
 from transformers import MarkupLMConfig
 from torch.nn import functional as F
 
-from classifier import MLPClassifier
-from encoder import XPathEmbeddings
-from graph import GNN
+from .classifier import MLPClassifier
+from .encoder import XPathEmbeddings
+from .graph import GNN
 from ..utils.functions import get_activation
 
 

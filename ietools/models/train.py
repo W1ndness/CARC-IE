@@ -99,7 +99,7 @@ def train(model, train_iter, test_iter,
           devices=d2l.try_all_gpus(),
           use_scaler=False):
     timer, num_batches = d2l.Timer(), len(train_iter)
-    writer = SummaryWriter('./logs/tensorboard')
+    writer = SummaryWriter('/root/tf-logs')
     animator = d2l.Animator(xlabel='epoch',
                             xlim=[1, num_epochs], ylim=[0, 1],
                             legend=['train loss', 'train acc', 'train recall', 'train precision', 'test acc'])
