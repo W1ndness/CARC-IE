@@ -12,6 +12,7 @@ from ..utils.functions import get_dom_tree
 from .graph import build_dom_graph, nx2dgl
 from ..models.encoder import TextEncoder
 from ..utils import swde as constants
+from ..utils.tag import tags_dict
 
 encoder = TextEncoder()
 
@@ -24,6 +25,46 @@ def mapping_labels(labels, label_map):
     return [label_map[label] for label in labels]
 
 
+def construct_xpath(xpath_tags, xpath_subscripts):
+    xpath = ""
+    for tagname, subs in zip(xpath_tags, xpath_subscripts):
+        xpath += f"/{tagname}"
+        if subs != 0:
+            xpath += f"[{subs}]"
+    return xpath
+
+
+def process_xpath(self, xpath: str):
+    if xpath.endswith("/tail"):
+        xpath = xpath[:-5]
+
+    xpath_tags_seq, xpath_subs_seq = [], []
+    units = xpath.split("/")
+
+    for unit in units:
+        if not unit:
+            continue
+        if '[' not in unit:
+            xpath_tags_seq.append(tags_dict.get(unit, 215))
+            xpath_subs_seq.append(0)
+        else:
+            xx = unit.split('[')
+            name = xx[0]
+            id = int(xx[1][:-1])
+            xpath_tags_seq.append(tags_dict.get(name, 215))
+            xpath_subs_seq.append(min(id, 10))
+
+    assert len(xpath_subs_seq) == len(xpath_tags_seq)
+
+    if len(xpath_tags_seq) > 15:
+        xpath_tags_seq = xpath_tags_seq[-15:]
+        xpath_subs_seq = xpath_subs_seq[-15:]
+
+    xpath_tags_seq = xpath_tags_seq + [216] * (15 - len(xpath_tags_seq))
+    xpath_subs_seq = xpath_subs_seq + [11] * (15 - len(xpath_subs_seq))
+    return xpath_tags_seq, xpath_subs_seq
+
+
 class Sample:
     def __init__(self, page_info: dict, page_html, website, label_map):
         self.idx = page_info["page_id"]
@@ -34,8 +75,15 @@ class Sample:
         if not self.text_nodes_texts:
             self.text_nodes_texts = [""]
         self.text_nodes_labels = mapping_labels([node["label"] for node in nodes_info], label_map)
-        self.xpath_tags_seq = page_info["xpath_tags_seq"]
-        self.xpath_subs_seq = page_info["xpath_subs_seq"]
+        self.node2xpath_tags = page_info["xpath_tags_seq"]
+        self.node2xpath_subs = page_info["xpath_subs_seq"]
+        node2xpaths = [construct_xpath(xpath_tags, xpath_subs) for xpath_tags, xpath_subs in zip(self.node2xpath_tags, self.node2xpath_subs)]
+        self.xpath_tags_seq, self.xpath_subs_seq = [], []
+        for xpath in node2xpaths:
+            xpath_tags_seq, xpath_subs_seq = process_xpath(self, xpath)
+            self.xpath_tags_seq.append(xpath_tags_seq)
+            self.xpath_subs_seq.append(xpath_subs_seq)
+
         backbone = build_dom_graph(dom)
         self.graph = nx2dgl(backbone)
 
@@ -47,8 +95,8 @@ class Sample:
         return {
             "text_nodes_ids": self.text_nodes_ids,
             "text_nodes_texts": embeddings,
-            "xpath_tags_seq": self.xpath_tags_seq,
-            "xpath_subs_seq": self.xpath_subs_seq,
+            "xpath_tags_seq": torch.tensor(self.xpath_tags_seq, dtype=torch.long),
+            "xpath_subs_seq": torch.tensor(self.xpath_subs_seq, dtype=torch.long),
             "graph": self.graph,
         }
 
@@ -76,17 +124,14 @@ def collate_fn(samples: list) -> T_co:
     batched_labels = torch.tensor(flatten(labels), dtype=torch.long)
     ids = flatten([feature["text_nodes_ids"] for feature in features])
     texts = flatten([feature["text_nodes_texts"] for feature in features])
-    xpath_tags_seq = torch.stack([feature["xpath_tags_seq"] for feature in features], dim=0)
-    xpath_subs_seq = torch.stack([feature["xpath_subs_seq"] for feature in features], dim=0)
-    graphs = dgl.batch([feature["graph"] for feature in features])
+    xpath_tags_seq = [feature["xpath_tags_seq"] for feature in features]
+    xpath_subs_seq = [feature["xpath_subs_seq"] for feature in features]
+    graphs = [feature["graph"] for feature in features]
     batched_features = {
         "ids": ids,
         "text_embeddings": torch.stack(texts, dim=0),
-        "xpath_tags_seq": xpath_tags_seq,
-        "xpath_subs_seq": xpath_subs_seq,
-        "graphs": graphs,
+        "xpath_tags_seq": torch.stack(xpath_tags_seq, dim=0),
+        "xpath_subs_seq": torch.stack(xpath_subs_seq, dim=0),
+        "graphs": dgl.batch(graphs),
     }
     return batched_features, batched_labels
-
-
-
