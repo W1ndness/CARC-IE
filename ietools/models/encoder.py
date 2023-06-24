@@ -66,7 +66,5 @@ class XPathEmbeddings(nn.Module):
         xpath_embeddings = self.inner2emb(
             self.dropout(self.activation(self.xpath_unitseq2_inner(xpath_embeddings))))
 
-        xpath_embeddings = self.xpath2hidden(xpath_embeddings)
-
         return xpath_embeddings
 

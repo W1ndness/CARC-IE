@@ -5,10 +5,13 @@ import torch
 from torch import nn
 from transformers import MarkupLMConfig
 from torch.nn import functional as F
+from d2l import torch as d2l
 
 from .classifier import MLPClassifier
 from .encoder import XPathEmbeddings
 from .graph import GNN
+
+devices = d2l.try_all_gpus()
 
 
 class ModelConfig:
@@ -39,9 +42,10 @@ def fetch_text_nodes_xpath_embeddings(xpath_embeddings, ids):
     text_node_embeddings = []
     for idx, indices in enumerate(ids):
         xpath_embedding = xpath_embeddings[idx]
+        indices = indices.to(devices[0])
         text_node_embedding = torch.index_select(xpath_embedding, 0, indices)
         text_node_embeddings.append(text_node_embedding)
-    return torch.stack(text_node_embeddings, dim=0)
+    return torch.cat(text_node_embeddings, dim=0)
 
 
 class Model(nn.Module):
@@ -49,10 +53,10 @@ class Model(nn.Module):
                  config: ModelConfig):
         super(Model, self).__init__()
         self.xpath_embeddings = XPathEmbeddings(config.xpath_embeddings_config)
-        self.gnn = GNN(config.text_embed_size + config.xpath_embeddings_config.hidden_size,
+        self.gnn = GNN(config.xpath_embeddings_config.hidden_size,
                        config.gnn_out_size,
                        config.gnn_activation)
-        self.classifier = MLPClassifier(config.gnn_out_size,
+        self.classifier = MLPClassifier(config.text_embed_size + config.gnn_out_size,
                                         config.num_classes,
                                         config.mlp_hidden_dims,
                                         config.mlp_activation,
@@ -66,8 +70,9 @@ class Model(nn.Module):
         xpath_subs_seq = batch['xpath_subs_seq']
         graphs = batch['graphs']
         xpath_embeddings = self.xpath_embeddings(xpath_tags_seq, xpath_subs_seq)
+        xpath_embeddings = torch.squeeze(xpath_embeddings)
         h = self.gnn(graphs, xpath_embeddings)
-        h = torch.split(h, graphs.batch_num_nodes(), dim=0)
+        h = torch.split(h, list(graphs.batch_num_nodes()), dim=0)
         text_node_xpath_embeddings = fetch_text_nodes_xpath_embeddings(h, ids)
 
         text_node_embeddings = torch.cat([text_embeddings, text_node_xpath_embeddings], dim=1)

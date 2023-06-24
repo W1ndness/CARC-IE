@@ -52,16 +52,16 @@ def process_xpath(self, xpath: str):
             name = xx[0]
             id = int(xx[1][:-1])
             xpath_tags_seq.append(tags_dict.get(name, 215))
-            xpath_subs_seq.append(min(id, 10))
+            xpath_subs_seq.append(min(id, 1000))
 
     assert len(xpath_subs_seq) == len(xpath_tags_seq)
 
-    if len(xpath_tags_seq) > 15:
-        xpath_tags_seq = xpath_tags_seq[-15:]
-        xpath_subs_seq = xpath_subs_seq[-15:]
+    if len(xpath_tags_seq) > 50:
+        xpath_tags_seq = xpath_tags_seq[-50:]
+        xpath_subs_seq = xpath_subs_seq[-50:]
 
-    xpath_tags_seq = xpath_tags_seq + [216] * (15 - len(xpath_tags_seq))
-    xpath_subs_seq = xpath_subs_seq + [11] * (15 - len(xpath_subs_seq))
+    xpath_tags_seq = xpath_tags_seq + [216] * (50 - len(xpath_tags_seq))
+    xpath_subs_seq = xpath_subs_seq + [1001] * (50 - len(xpath_subs_seq))
     return xpath_tags_seq, xpath_subs_seq
 
 
@@ -93,7 +93,7 @@ class Sample:
             embeddings = encoder(self.text_nodes_texts).cpu()
             torch.cuda.empty_cache()
         return {
-            "text_nodes_ids": self.text_nodes_ids,
+            "text_nodes_ids": torch.tensor(self.text_nodes_ids, dtype=torch.long),
             "text_nodes_texts": embeddings,
             "xpath_tags_seq": torch.tensor(self.xpath_tags_seq, dtype=torch.long),
             "xpath_subs_seq": torch.tensor(self.xpath_subs_seq, dtype=torch.long),
@@ -122,16 +122,16 @@ def flatten(nested_list):
 def collate_fn(samples: list) -> T_co:
     features, labels = zip(*samples)
     batched_labels = torch.tensor(flatten(labels), dtype=torch.long)
-    ids = flatten([feature["text_nodes_ids"] for feature in features])
+    ids = [feature["text_nodes_ids"] for feature in features]
     texts = flatten([feature["text_nodes_texts"] for feature in features])
-    xpath_tags_seq = [feature["xpath_tags_seq"] for feature in features]
-    xpath_subs_seq = [feature["xpath_subs_seq"] for feature in features]
+    xpath_tags_seq = torch.cat([feature["xpath_tags_seq"] for feature in features], dim=0)
+    xpath_subs_seq = torch.cat([feature["xpath_subs_seq"] for feature in features], dim=0)
     graphs = [feature["graph"] for feature in features]
     batched_features = {
         "ids": ids,
         "text_embeddings": torch.stack(texts, dim=0),
-        "xpath_tags_seq": torch.stack(xpath_tags_seq, dim=0),
-        "xpath_subs_seq": torch.stack(xpath_subs_seq, dim=0),
+        "xpath_tags_seq": torch.unsqueeze(xpath_tags_seq, dim=0),
+        "xpath_subs_seq": torch.unsqueeze(xpath_subs_seq, dim=0),
         "graphs": dgl.batch(graphs),
     }
     return batched_features, batched_labels

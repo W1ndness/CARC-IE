@@ -6,18 +6,20 @@ from torch.optim import Adam, AdamW, SGD
 from absl import app
 from absl import flags
 from absl import logging
-import os
-import sys
-
 from transformers import MarkupLMConfig
 
+import os
+import sys
+import warnings
+
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), '../..'))
+warnings.filterwarnings("ignore")
 
 from ietools.utils.functions import load_from_pkl
 from ietools.utils import swde as constants
 from ietools.models.dataset import Sample, SampleDataset, collate_fn
 from ietools.models.ie import Model, ModelConfig
-from ietools.models.train import train
+from ietools.models.train import train, test
 
 FLAGS = flags.FLAGS
 
@@ -124,14 +126,15 @@ def prepare_in_vertical_dataset(packed_data, vertical, num_seeds):
     website_counts = read_website_counts_from_list(website_list_path, vertical)
     train_dataset, val_dataset = make_dataset(vertical, seed_websites, website_counts,
                                               packed_vertical_data, split=True)
-    logging.info(f"Finished preparing in-vertical dataset for {vertical}")
+    logging.info(f"Finished preparing in-vertical training and validation dataset for {vertical}")
     test_dataset = make_dataset(vertical, test_websites, website_counts, packed_vertical_data)
+    logging.info(f"Finished preparing in-vertical testing dataset for {vertical}")
     num_classes = len(constants.ATTRIBUTES[vertical]) + 1
     return train_dataset, val_dataset, test_dataset, num_classes
 
 
-def in_vertical_train(train_dataset, val_dataset, test_dataset, num_classes):
-    logging.info(f"Training in-vertical model")
+def in_vertical_train(train_dataset, val_dataset, test_dataset, num_classes, vertical):
+    logging.info(f"Training in-vertical model on {vertical}")
     logging.info(f"Number of classes: {num_classes}")
     logging.info(f"Number of training samples: {len(train_dataset)}")
     logging.info(f"Number of validation samples: {len(val_dataset)}")
@@ -167,6 +170,7 @@ def in_vertical_train(train_dataset, val_dataset, test_dataset, num_classes):
     loss = nn.CrossEntropyLoss()
     optimizer = Adam(model.parameters(), lr=FLAGS.lr)
     train(model, train_iter, val_iter, loss, optimizer, FLAGS.num_epochs)
+    test(model, test_iter)
 
 
 def main(_):
@@ -176,7 +180,7 @@ def main(_):
         train_dataset, val_dataset, test_dataset, num_classes = prepare_in_vertical_dataset(packed_data,
                                                                                             vertical,
                                                                                             FLAGS.num_seeds)
-        in_vertical_train(train_dataset, val_dataset, test_dataset, num_classes)
+        in_vertical_train(train_dataset, val_dataset, test_dataset, num_classes, vertical)
 
 
 if __name__ == '__main__':
