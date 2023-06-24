@@ -167,8 +167,8 @@ def train(model, train_iter, test_iter,
                  f'{str(devices)}')
 
 
-def test(model, test_iter, devices=d2l.try_all_gpus):
-    avg_acc, avg_recall, avg_precision, avg_f1 = evaluate_gpu(model, test_iter, devices)
+def test(model, test_iter, devices=d2l.try_all_gpus()):
+    avg_acc, avg_recall, avg_precision, avg_f1 = evaluate_gpu(model, test_iter, devices[0])
     logging.info(f'Average accuracy: {avg_acc}')
     logging.info(f'Average recall: {avg_recall}')
     logging.info(f'Average precision: {avg_precision}')

@@ -19,6 +19,7 @@ class ModelConfig:
                  text_embed_size: int,
                  gnn_out_size: int,
                  xpath_embeddings_config: MarkupLMConfig,
+                 gnn_num_layers: int,
                  gnn_activation: str,
                  gnn_dropout: float,
                  mlp_hidden_dims: List[int],
@@ -29,6 +30,7 @@ class ModelConfig:
         self.text_embed_size = text_embed_size
         self.gnn_out_size = gnn_out_size
         self.xpath_embeddings_config = xpath_embeddings_config
+        self.gnn_num_layers = gnn_num_layers
         self.gnn_activation = gnn_activation
         self.gnn_dropout = gnn_dropout
         self.mlp_hidden_dims = mlp_hidden_dims
@@ -55,7 +57,9 @@ class Model(nn.Module):
         self.xpath_embeddings = XPathEmbeddings(config.xpath_embeddings_config)
         self.gnn = GNN(config.xpath_embeddings_config.hidden_size,
                        config.gnn_out_size,
-                       config.gnn_activation)
+                       config.gnn_num_layers,
+                       config.gnn_activation,
+                       config.gnn_dropout)
         self.classifier = MLPClassifier(config.text_embed_size + config.gnn_out_size,
                                         config.num_classes,
                                         config.mlp_hidden_dims,

@@ -150,15 +150,11 @@ def in_vertical_train(train_dataset, val_dataset, test_dataset, num_classes, ver
                           shuffle=FLAGS.shuffle,
                           drop_last=FLAGS.drop_last,
                           collate_fn=collate_fn)
-    test_iter = DataLoader(test_dataset,
-                           batch_size=FLAGS.batch_size,
-                           shuffle=FLAGS.shuffle,
-                           drop_last=FLAGS.drop_last,
-                           collate_fn=collate_fn)
     xpath_embed_config = MarkupLMConfig()
     config = ModelConfig(text_embed_size=768,
                          gnn_out_size=384,
                          xpath_embeddings_config=xpath_embed_config,
+                         gnn_num_layers=2,
                          gnn_activation='ReLU',
                          gnn_dropout=.5,
                          mlp_hidden_dims=[],
@@ -170,6 +166,11 @@ def in_vertical_train(train_dataset, val_dataset, test_dataset, num_classes, ver
     loss = nn.CrossEntropyLoss()
     optimizer = Adam(model.parameters(), lr=FLAGS.lr)
     train(model, train_iter, val_iter, loss, optimizer, FLAGS.num_epochs)
+    test_iter = DataLoader(test_dataset,
+                           batch_size=FLAGS.batch_size,
+                           shuffle=FLAGS.shuffle,
+                           drop_last=FLAGS.drop_last,
+                           collate_fn=collate_fn)
     test(model, test_iter)
 
 

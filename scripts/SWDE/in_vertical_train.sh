@@ -1,5 +1,7 @@
 clear
 
+rm -rf /root/tf-logs/*
+
 python3 ../../src/SWDE/in_vertical_train.py \
 --swde_path=../../../SWDE \
 --pack_path=../../../pack_data.pkl \
