@@ -1,3 +1,4 @@
+from itertools import chain
 from typing import List
 
 import torch
@@ -66,16 +67,17 @@ class SampleDataset(Dataset):
         return self.len
 
 
+def flatten(nested_list):
+    return [item for item in chain(*nested_list)]
+
+
 def collate_fn(samples: list) -> T_co:
     features, labels = zip(*samples)
-    if not isinstance(labels, torch.Tensor):
-        batched_labels = torch.Tensor(labels)
-    else:
-        batched_labels = labels
-    ids = [feature["text_nodes_ids"] for feature in features]
-    texts = [feature["text_nodes_texts"] for feature in features]
-    xpath_tags_seq = [feature["xpath_tags_seq"] for feature in features]
-    xpath_subs_seq = [feature["xpath_subs_seq"] for feature in features]
+    batched_labels = torch.tensor(flatten(labels), dtype=torch.long)
+    ids = flatten([feature["text_nodes_ids"] for feature in features])
+    texts = flatten([feature["text_nodes_texts"] for feature in features])
+    xpath_tags_seq = torch.stack([feature["xpath_tags_seq"] for feature in features], dim=0)
+    xpath_subs_seq = torch.stack([feature["xpath_subs_seq"] for feature in features], dim=0)
     graphs = dgl.batch([feature["graph"] for feature in features])
     batched_features = {
         "ids": ids,

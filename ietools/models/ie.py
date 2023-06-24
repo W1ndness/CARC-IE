@@ -1,5 +1,6 @@
 from typing import List
 
+import dgl
 import torch
 from torch import nn
 from transformers import MarkupLMConfig
@@ -40,7 +41,7 @@ def fetch_text_nodes_xpath_embeddings(xpath_embeddings, ids):
         xpath_embedding = xpath_embeddings[idx]
         text_node_embedding = torch.index_select(xpath_embedding, 0, indices)
         text_node_embeddings.append(text_node_embedding)
-    return torch.stack(text_node_embeddings)
+    return torch.stack(text_node_embeddings, dim=0)
 
 
 class Model(nn.Module):
@@ -66,7 +67,9 @@ class Model(nn.Module):
         graphs = batch['graphs']
         xpath_embeddings = self.xpath_embeddings(xpath_tags_seq, xpath_subs_seq)
         h = self.gnn(graphs, xpath_embeddings)
+        h = torch.split(h, graphs.batch_num_nodes(), dim=0)
         text_node_xpath_embeddings = fetch_text_nodes_xpath_embeddings(h, ids)
+
         text_node_embeddings = torch.cat([text_embeddings, text_node_xpath_embeddings], dim=1)
         output = self.classifier(text_node_embeddings)
         return output
