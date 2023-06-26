@@ -139,6 +139,24 @@ def in_vertical_train(train_dataset, val_dataset, test_dataset, num_classes, ver
     logging.info(f"Number of training samples: {len(train_dataset)}")
     logging.info(f"Number of validation samples: {len(val_dataset)}")
     logging.info(f"Number of test samples: {len(test_dataset)}")
+    xpath_embed_config = MarkupLMConfig()
+    config = ModelConfig(text_embed_size=768,
+                         gnn_out_size=768,
+                         xpath_embeddings_config=xpath_embed_config,
+                         gnn_model='gcn',
+                         gnn_num_layers=3,
+                         gnn_activation='ELU',
+                         gnn_dropout=.5,
+                         mlp_hidden_dims=[],
+                         mlp_activation='ELU',
+                         mlp_dropout=.5,
+                         mlp_batch_norm=True,
+                         num_classes=num_classes,
+                         gnn_hidden_size=768,
+                         gat_num_heads=8,
+                         mpnn_msg_func=lambda edges: {'m': edges.src['h']},
+                         mpnn_update_func=lambda nodes: {'h': torch.mean(nodes.mailbox['m'], dim=1)})
+    model = Model(config)
     logging.info("Preparing dataloader.")
     train_iter = DataLoader(train_dataset,
                             batch_size=FLAGS.batch_size,
@@ -150,19 +168,6 @@ def in_vertical_train(train_dataset, val_dataset, test_dataset, num_classes, ver
                           shuffle=FLAGS.shuffle,
                           drop_last=FLAGS.drop_last,
                           collate_fn=collate_fn)
-    xpath_embed_config = MarkupLMConfig()
-    config = ModelConfig(text_embed_size=768,
-                         gnn_out_size=384,
-                         xpath_embeddings_config=xpath_embed_config,
-                         gnn_num_layers=2,
-                         gnn_activation='ReLU',
-                         gnn_dropout=.5,
-                         mlp_hidden_dims=[],
-                         mlp_activation='ReLU',
-                         mlp_dropout=.5,
-                         mlp_batch_norm=True,
-                         num_classes=num_classes)
-    model = Model(config)
     loss = nn.CrossEntropyLoss()
     optimizer = Adam(model.parameters(), lr=FLAGS.lr)
     train(model, train_iter, val_iter, loss, optimizer, FLAGS.num_epochs)
