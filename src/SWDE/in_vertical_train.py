@@ -1,3 +1,4 @@
+import numpy as np
 from sklearn.model_selection import train_test_split
 import torch
 from torch import nn
@@ -176,17 +177,26 @@ def in_vertical_train(train_dataset, val_dataset, test_dataset, num_classes, ver
                            shuffle=FLAGS.shuffle,
                            drop_last=FLAGS.drop_last,
                            collate_fn=collate_fn)
-    test(model, test_iter)
+    return test(model, test_iter)
 
 
 def main(_):
     packed_data = load_from_pkl(FLAGS.pack_path)
     verticals = FLAGS.verticals.split(",")
+    avg_acc, avg_recall, avg_precision, avg_f1 = [], [], [], []
     for vertical in verticals:
         train_dataset, val_dataset, test_dataset, num_classes = prepare_in_vertical_dataset(packed_data,
                                                                                             vertical,
                                                                                             FLAGS.num_seeds)
-        in_vertical_train(train_dataset, val_dataset, test_dataset, num_classes, vertical)
+        acc, recall, precision, f1 = in_vertical_train(train_dataset, val_dataset, test_dataset, num_classes, vertical)
+        avg_acc.append(acc)
+        avg_recall.append(recall)
+        avg_precision.append(precision)
+        avg_f1.append(f1)
+    logging.info(f"Total average accuracy: {np.mean(avg_acc)}")
+    logging.info(f"Total average recall: {np.mean(avg_recall)}")
+    logging.info(f"Total average precision: {np.mean(avg_precision)}")
+    logging.info(f"Total average F1: {np.mean(avg_f1)}")
 
 
 if __name__ == '__main__':

@@ -112,7 +112,8 @@ class Model(nn.Module):
         h = self.gnn(graphs, xpath_embeddings)
         h = torch.split(h, list(graphs.batch_num_nodes()), dim=0)
         text_node_xpath_embeddings = fetch_text_nodes_xpath_embeddings(h, ids)
-
-        text_node_embeddings = torch.cat([text_embeddings, text_node_xpath_embeddings], dim=1)
+        assert text_node_xpath_embeddings.size(1) == text_embeddings.size(1)
+        text_node_embeddings = torch.cat([F.normalize(text_embeddings), F.normalize(text_node_xpath_embeddings)],
+                                         dim=1)
         output = self.classifier(text_node_embeddings)
         return output

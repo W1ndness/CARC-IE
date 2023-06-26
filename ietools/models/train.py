@@ -161,8 +161,6 @@ def train(model, train_iter, test_iter,
                             "Val F1 Score": test_f1},
                            epoch)
     animator.fig.show()
-    logging.info(f'loss {metric[0] / metric[2]:.3f}, train acc '
-                 f'{metric[1]:.3f}, test acc {test_acc:.3f}')
     logging.info(f'{metric[4] * num_epochs / timer.sum():.1f} examples/sec on '
                  f'{str(devices)}')
 
@@ -173,4 +171,5 @@ def test(model, test_iter, devices=d2l.try_all_gpus()):
     logging.info(f'Average recall: {avg_recall}')
     logging.info(f'Average precision: {avg_precision}')
     logging.info(f'Average macro f1: {avg_f1}')
+    return avg_acc, avg_recall, avg_precision, avg_f1
 

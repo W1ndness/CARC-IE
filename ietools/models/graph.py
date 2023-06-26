@@ -1,3 +1,6 @@
+from collections import deque
+from math import sqrt
+
 from dgl import nn as dglnn
 import dgl
 from dgl.nn.pytorch import GraphConv, GATConv
@@ -30,12 +33,73 @@ def build_dom_graph(dom):
     return g
 
 
+def vis_distance(node1, node2):
+    # calculate Euclidean distance between two nodes
+    x1, y1 = node1.attrib['x'], node1.attrib['y']
+    x2, y2 = node2.attrib['x'], node2.attrib['y']
+    return sqrt((int(x2) - int(x1)) ** 2 + (int(y2) - int(y1)) ** 2)
+
+
+def depth_distance(node1, node2):
+    # calculate depth distance between two nodes in the DOM tree
+    depth1 = len(node1.xpath('ancestor::*'))
+    depth2 = len(node2.xpath('ancestor::*'))
+    return abs(depth2 - depth1)
+
+
+def hop_distance(node1, node2):
+    # calculate hop distance between two nodes in the DOM tree
+    queue = deque([(node1, 0)])
+    visited = set()
+    while queue:
+        current_node, current_depth = queue.popleft()
+        if current_node == node2:
+            return current_depth
+        visited.add(current_node)
+        for child in current_node.iterchildren():
+            if child not in visited:
+                queue.append((child, current_depth + 1))
+    return float('inf')
+
+
+def find_nearest_neighbors(dom_nodes, nodeset, distance):
+    result = []
+    for node in dom_nodes:
+        min_distance = float('inf')
+        nearest_node = None
+        for neighbor in nodeset:
+            d = distance(node, neighbor)
+            if d < min_distance:
+                min_distance = d
+                nearest_node = neighbor
+        result.append((nearest_node, min_distance))
+    return result
+
+
+def build_text_node_graph(dom, distance):
+    g = nx.DiGraph()
+    text_nodes = [element for element in dom.iter() if element.text.strip() != ""]
+    text2idx = {element: idx for idx, element in enumerate(dom.iter()) if element.text.strip() != ""}
+    for element, idx in text2idx.items():
+        g.add_node(idx)
+    nearest = find_nearest_neighbors(text_nodes, text_nodes, distance)
+    for element, idx in text2idx.items():
+        g.add_edge(idx, idx)
+        g.add_edge(idx,
+                   text2idx[nearest[idx][0]],
+                   weight=nearest[idx][1])
+        g.add_edge(text2idx[nearest[idx][0]],
+                   idx,
+                   weight=nearest[idx][1])
+    return g
+
+
 def nx2dgl(g: nx.Graph):
     adj = np.array(nx.adjacency_matrix(g).todense())
     if len(np.where(~adj.any(axis=1))[0]):
         raise ValueError(g, "Graph has zero degree node.")
     graph_as_dgl = dgl.from_networkx(g)
-    return dgl.add_self_loop(graph_as_dgl)
+    return graph_as_dgl
 
 
 class GCN(nn.Module):
@@ -45,7 +109,7 @@ class GCN(nn.Module):
         self.layers.append(GraphConv(in_feats, hidden_size, activation=get_activation(activation)))
         for i in range(num_layers - 2):
             self.layers.append(GraphConv(hidden_size, hidden_size, activation=get_activation(activation)))
-        self.layers.append(GraphConv(hidden_size, out_feats, activation=get_activation))
+        self.layers.append(GraphConv(hidden_size, out_feats, activation=get_activation(activation)))
 
     def forward(self, g, h):
         for layer in self.layers:
